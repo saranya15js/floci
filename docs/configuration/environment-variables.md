@@ -80,6 +80,31 @@ See [TLS / HTTPS](./tls.md) for SDK configuration examples and WebSocket (`wss:/
 | `FLOCI_PROTOCOLS_STRICT_CLAIMING` | `false` | Reject RPC-signaled requests that no supported wire protocol claims, per the [Smithy wire-protocol-selection guide](https://smithy.io/2.0/guides/wire-protocol-selection.html) (e.g. an unknown `Smithy-Protocol` header value or an unimplemented `rpc-v2-json` request). When disabled such requests are logged and pass through, and are handled as the protocol of the route that serves them: one served by the JSON, CBOR or Query endpoint is an RPC call, and one served by a service's route is a REST request |
 | `FLOCI_PROTOCOLS_REJECT_UNKNOWN_SERVICE_SCOPE` | `true` | Reject REST requests whose SigV4 credential scope names a service Floci does not implement, with `UnknownOperationException` instead of letting them fall through to S3's path-style routes and return a misleading `NoSuchBucket`. Set to `false` if Floci serves a route whose signing scope is not yet enumerated: the request then falls through as before instead of failing with a 404 |
 
+
+---
+
+## Request Log
+
+| Variable | Default | Description |
+|---|---|---|
+| `FLOCI_REQUEST_LOG_ENABLED` | `false` | Write every request and its response to the request log, one JSON object per line |
+| `FLOCI_REQUEST_LOG_FILE` | `./floci-requests.jsonl` | Where the request log is written |
+
+Each line of the request log is one JSON object shaped like a HAR 1.2 `entry`: the request with its headers, query
+string and body, the response with its status, headers and body, and the time taken. It also carries
+`callerAccessKeyId`, the access key id the request was signed with, so each line can be tied to the caller that made
+it, whether that is Terraform, CloudFormation or a direct SDK or CLI call. A request body over 256 KiB is not
+captured and a response body is cut at 256 KiB. A binary response body is stored base64, and a response streamed to
+the client is not read.
+
+!!! warning "The request log holds secrets"
+    Request and response bodies are written as plain text, and they can carry secrets: a secret access key in a
+    response, a password in a request, a secret value in a parameter. Floci redacts the `Authorization`,
+    `X-Amz-Security-Token` and `X-Amz-Content-Sha256` headers and the `X-Amz-Signature`, `X-Amz-Security-Token` and
+    `X-Amz-Credential` query parameters, but a secret inside a body is written as is. On a file system with POSIX
+    permissions, Floci creates the file readable and writable by its owner only; a file that already exists keeps its
+    permissions. Keep the log off in shared environments, and do not commit or share the file.
+
 ---
 
 ## Storage
